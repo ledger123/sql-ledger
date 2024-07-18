@@ -9,6 +9,7 @@
 
 package Form;
 
+use DBIx::Simple;
 
 sub new {
   my ($type, $userspath) = @_;
@@ -2187,6 +2188,11 @@ sub dbconnect_noauto {
 
 }
 
+sub db_init {
+    my ( $self, $myconfig ) = @_;
+    $self->{dbh}       = $self->dbconnect_noauto($myconfig);
+    $self->{dbs}       = DBIx::Simple->connect( $self->{dbh} );
+}
 
 sub dbquote {
   my ($self, $var, $type) = @_;
@@ -3072,6 +3078,53 @@ sub all_business {
   $dbh->disconnect if $disconnect;
 
 }
+
+
+sub check_serialnumber {
+  my ($self, $module, $myconfig) = @_;
+  $self->db_init($myconfig);
+
+  my $query;
+
+  for my $i (1 .. $self->{rowcount} - 1){
+      next if !$self->{"serialnumber_$i"};
+      my $serialnumber = uc $self->{"serialnumber_$i"};
+      $serialnumber = $self->like($serialnumber);
+      if ($module eq 'ar'){
+        $query = qq|
+            SELECT invnumber
+            FROM invoice i
+            JOIN ap ON ap.id = i.trans_id
+            WHERE serialnumber LIKE ?
+            LIMIT 1
+        |;
+        my $invnumber = $self->{dbs}->query($query, $serialnumber)->list;
+        $self->info("Item with this serial number has not been purchased ..." . $self->{"serialnumber_$i"}) if !$invnumber;
+      }
+
+      if ($form->{id}){
+        $query = qq|
+            SELECT invnumber
+            FROM invoice i
+            JOIN $module ON $module.id = i.trans_id
+            WHERE serialnumber LIKE ?
+            AND id <> $form->{id}
+        |;
+      } else {
+        $query = qq|
+            SELECT invnumber
+            FROM invoice i
+            JOIN $module ON $module.id = i.trans_id
+            WHERE serialnumber LIKE ?
+        |;
+      }
+      my @invoices = $self->{dbs}->query($query, $serialnumber)->hashes;
+      for my $invoice (@invoices){
+          $self->info("Serial number already exists in invoice " . $invoice->{invnumber} . " ...");
+      }
+  }
+}
+
 
 
 sub create_links {

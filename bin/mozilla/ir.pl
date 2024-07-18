@@ -1098,7 +1098,9 @@ sub update {
   if (($form->{"partnumber_$i"} eq "") && ($form->{"description_$i"} eq "") && ($form->{"partsgroup_$i"} eq "" && $form->{"partsgroupcode_$i"} eq "")) {
 
     &check_form;
-    
+
+    $form->check_serialnumber('ap', \%myconfig);
+
   } else {
 
     IR->retrieve_item(\%myconfig, \%$form);
