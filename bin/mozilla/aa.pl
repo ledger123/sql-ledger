@@ -208,6 +208,7 @@ sub create_links {
   for (@curr) { $form->{selectcurrency} .= "$_\n" }
 
   AA->get_name(\%myconfig, \%$form);
+  $form->selecttax(\%myconfig); # for linetax
 
   $form->{currency} =~ s/ //g;
   $form->{duedate} = $temp{duedate} if $temp{duedate};
@@ -342,6 +343,11 @@ sub create_links {
 
 	  if ($akey eq 'amount') {
 	    $form->{"description_$i"} = $form->{acc_trans}{$key}->[$i-1]->{memo};
+
+        # linetax values
+        $form->{"tax_$i"}           = "$form->{acc_trans}{$key}->[ $i - 1 ]->{tax_accno}--$form->{acc_trans}{$key}->[ $i - 1 ]->{tax_description}";
+        $form->{"linetaxamount_$i"} = $form->{acc_trans}{$key}->[ $i - 1 ]->{linetaxamount} * $ml;
+
 	    $form->{rowcount}++;
 	    $netamount += $form->{"${akey}_$i"};
 
@@ -422,6 +428,15 @@ sub create_links {
   $form->{rowcount} = 1 unless $form->{"$form->{ARAP}_amount_1"};
 
   $form->{locked} = ($form->{revtrans}) ? '1' : ($form->datetonum(\%myconfig, $form->{transdate}) <= $form->{closedto});
+
+  # Uncheck summary tax accounts when linetax is enabled.
+  if ( $form->{id} ) {
+    for (@taxaccounts) {
+        if ( $form->{"tax_$_"} ) { $form->{"calctax_$_"} = 0 }
+    }
+  } else {
+    for (@taxaccounts) { $form->{"calctax_$_"} = !$form->{linetax} }  
+  }
 
   # readonly
   if (! $form->{readonly}) {
@@ -648,7 +663,7 @@ print qq|
 
   $form->hide_form(qw(id type printed emailed sort closedto locked oldtransdate oldduedate oldcurrency audittrail recurring checktax creditlimit creditremaining defaultcurrency rowcount oldterms batch batchid batchnumber batchdescription cdt precision remittancevoucher reference_rows referenceurl olddepartment company));
   $form->hide_form("select$form->{vc}");
-  $form->hide_form(map { "select$_" } qw(formname currency department employee projectnumber language paymentmethod printer));
+  $form->hide_form(map { "select$_" } qw(formname currency department employee projectnumber language paymentmethod printer tax));
   $form->hide_form("old$form->{vc}", "$form->{vc}_id", "old$form->{vc}number");
   $form->hide_form(map { "select$_" } ("$form->{ARAP}_amount", "$form->{ARAP}", "$form->{ARAP}_paid", "$form->{ARAP}_discount"));
 
@@ -747,6 +762,13 @@ print qq|
 |;
     }
 
+    # linetax fields
+    if ($form->{selecttax}){
+        $linetax = qq|
+          <th>| . $locale->text('Tax') . qq|</th>
+          <th>| . $locale->text('Tax Amount') . qq|</th>
+        |;
+    }
      print qq|
 	<tr>
 	  <th>|.$locale->text('Amount').qq|</th>
@@ -754,6 +776,7 @@ print qq|
 	  <th>|.$locale->text('Account').qq|</th>
 	  <th>|.$locale->text('Description').qq|</th>
 	  $project
+      $linetax
 	</tr>
 |;
  
@@ -767,6 +790,19 @@ print qq|
           .$form->select_option($form->{selectprojectnumber}, $form->{"projectnumber_$i"}, 1)
 	  .qq|</select></td>
 |;
+    }
+
+    # linetax fields
+    if ($form->{selecttax}){
+        $linetax = qq|
+            <td>
+              <select name="tax_$i">| . $form->select_option( $form->{selecttax}, $form->{"tax_$i"} ) . qq|</select>
+              <input type=hidden name="oldtax_$i" value='$form->{"tax_$i"}'>
+            </td>
+            <td align="right">
+                <input type=text name="linetaxamount_$i" size=10 value="| . $form->format_amount( \%myconfig, $form->{"linetaxamount_$i"}, $form->{precision} ) . qq|">
+            </td>
+        |;
     }
 
     if (($rows = $form->numtextrows($form->{"description_$i"}, 40)) > 1) {
@@ -788,6 +824,7 @@ print qq|
 	  .qq|</select></td>
 	  $description
 	  $project
+      $linetax
 	</tr>
 |;
   }
@@ -1173,7 +1210,38 @@ sub update {
 
     $form->{"$form->{ARAP}_amount_$form->{rowcount}"} = $form->{"$form->{ARAP}_amount_$count"};
 
-    for (1 .. $form->{rowcount}) { $form->{invtotal} += $form->{"amount_$_"} }
+    # reset individual tax amounts only when we are using linetax
+    if ($form->{selecttax}){
+        for $i (1 .. $form->{rowcount} ){
+            for (split / /, $form->{taxaccounts}) { $form->{"tax_$_"} = 0 }
+        }
+    } else {
+        for (split / /, $form->{taxaccounts}) { $form->{"tax_$_"} = $form->parse_amount( \%myconfig, $form->{"tax_$_"} ) if !$form->{firsttime} }
+    }
+
+    # Calculate linetax when there is amount. Otherwise leave the user entered amount as it is.
+    $form->{oldtaxincluded} = ($form->{oldtaxincluded}) ? '1' : "";
+    for ( 1 .. $form->{rowcount} ) { 
+        $form->{"linetaxamount_$_"} = $form->parse_amount(\%myconfig, $form->{"linetaxamount_$_"});
+        if ($form->{"tax_$_"}){
+
+           ($taxaccno, $null) = split(/--/, $form->{"tax_$_"});
+           if (!$form->{"linetaxamount_$_"} || $form->{"tax_$_"} ne $form->{"oldtax_$_"} || $form->{"amount_$_"} != $form->{"oldamount_$_"} || $form->{taxincluded} ne $form->{oldtaxincluded} ){
+                if ($form->{"amount_$_"}){ 
+                    if ($form->{taxincluded}){
+                        $form->{"linetaxamount_$_"} = $form->{"amount_$_"} - $form->{"amount_$_"} / (1 + $form->{"${taxaccno}_rate"});
+                    } else {
+                        $form->{"linetaxamount_$_"} = $form->{"amount_$_"} * $form->{"${taxaccno}_rate"};
+                    }
+                }
+           }
+           $form->{"tax_$taxaccno"} += $form->{"linetaxamount_$_"};
+
+        } else {
+            $form->{"linetaxamount_$_"} = 0;
+        }
+        $form->{invtotal} += $form->{"amount_$_"} 
+    }
 
     if ($form->{transdate} ne $form->{oldtransdate} || $form->{currency} ne $form->{oldcurrency}) {
       $form->{exchangerate} = $form->check_exchangerate(\%myconfig, $form->{currency}, $form->{transdate});
@@ -1279,7 +1347,7 @@ sub update {
     
   } else {
     foreach $item (@taxaccounts) {
-      $form->{"calctax_$item"} = 1 if $form->{calctax};
+      $form->{"calctax_$item"} = 0 if $form->{calctax};
       
       if ($form->{"calctax_$item"}) {
 	$x = ($form->{cdt}) ? $form->{invtotal} - $form->{discount_paid} : $form->{invtotal};
@@ -1349,6 +1417,9 @@ sub update {
   $form->{creditremaining} -= ($form->{invtotal} - $totalpaid + $form->{oldtotalpaid} - $form->{oldinvtotal}) * $ml;
   $form->{oldinvtotal} = $form->{invtotal};
   $form->{oldtotalpaid} = $totalpaid;
+
+  # rebuild selecttax for linetax if customer / vendor has changed.
+  $form->selecttax(\%myconfig);
 
   $form->{printed} =~ s/\s??$form->{formname}\s??//;
   $form->{printed} .= " $form->{formname}" if $form->{"$form->{formname}_printed"};

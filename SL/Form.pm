@@ -2549,6 +2549,26 @@ sub get_employee {
 }
 
 
+# linetax
+sub selecttax {
+  my ($self, $myconfig) = @_;
+
+  my $dbh = $self->dbconnect($myconfig);
+
+  $self->{linetax} = $dbh->selectrow_array("SELECT fldvalue FROM defaults WHERE fldname='linetax'");
+
+  return if !$self->{linetax};
+
+  $self->{selecttax} = "\n";
+  my $query = qq|SELECT accno, description FROM chart WHERE link LIKE '%$self->{ARAP}_tax%' ORDER BY accno|;
+  my $sth   = $dbh->prepare($query);
+  $sth->execute || $self->dberror($query);
+  while ( $ref = $sth->fetchrow_hashref(NAME_lc) ) {
+    $self->{selecttax} .= "$ref->{accno}--$ref->{description}\n" if index( $self->{taxaccounts}, $ref->{accno} ) != -1;
+  }
+}
+
+
 # this sub gets the id and name from $table
 sub get_name {
   my ($self, $myconfig, $table, $transdate) = @_;
@@ -3342,9 +3362,11 @@ sub create_links {
                 ac.memo, ac.transdate, ac.cleared, ac.project_id,
 		p.projectnumber, ac.id, y.exchangerate,
 		l.description AS translation,
-		pm.description AS paymentmethod, y.paymentmethod_id
+		pm.description AS paymentmethod, y.paymentmethod_id,
+        ac.tax_chart_id, ac.linetaxamount, ctax.accno AS tax_accno, ctax.description AS tax_description
 		FROM acc_trans ac
 		JOIN chart c ON (c.id = ac.chart_id)
+        LEFT JOIN chart ctax ON (ctax.id = ac.tax_chart_id)
 		LEFT JOIN project p ON (p.id = ac.project_id)
 		LEFT JOIN payment y ON (y.trans_id = ac.trans_id AND ac.id = y.id)
 		LEFT JOIN paymentmethod pm ON (pm.id = y.paymentmethod_id)
