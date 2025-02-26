@@ -287,6 +287,8 @@ sub search {
   $includeinreport{accno} = { ndx => $i++, sort => accno, checkbox => 1, html => qq|<input name="l_accno" class=checkbox type=checkbox value=Y $form->{l_accno}>|, label => $locale->text('Account') };
   $includeinreport{gifi_accno} = { ndx => $i++, sort => gifi_accno, checkbox => 1, html => qq|<input name="l_gifi_accno" class=checkbox type=checkbox value=Y $form->{l_gifi_accno}>|, label => $locale->text('GIFI') };
   $includeinreport{contra} = { ndx => $i++, checkbox => 1, html => qq|<input name="l_contra" class=checkbox type=checkbox value=Y $form->{l_contra}>|, label => $locale->text('Contra') };
+  $includeinreport{linetax_accno} = { ndx => $i++, checkbox => 1, html => qq|<input name="l_linetax_accno" class=checkbox type=checkbox value=Y $form->{l_linetax_accno}>|, label => $locale->text('Line Tax Account') };
+  $includeinreport{linetaxamount} = { ndx => $i++, checkbox => 1, html => qq|<input name="l_linetaxamount" class=checkbox type=checkbox value=Y $form->{l_linetaxamount}>|, label => $locale->text('Line Tax Amount') };
 
   @f = ();
   $form->{flds} = "";
@@ -865,15 +867,19 @@ sub transactions {
     
     $subtotaldebit += $ref->{debit};
     $subtotalcredit += $ref->{credit};
+    $subtotallinetaxamount += $ref->{linetaxamount};
     
     $accountsubtotaldebit += $ref->{debit};
     $accountsubtotalcredit += $ref->{credit};
+    $accountsubtotallinetaxamount += $ref->{linetaxamount};
 
     $totaldebit += $ref->{debit};
     $totalcredit += $ref->{credit};
+    $totallinetaxamount += $ref->{linetaxamount};
 
     $ref->{debit} = $form->format_amount(\%myconfig, $ref->{debit}, $form->{precision}, "&nbsp;");
     $ref->{credit} = $form->format_amount(\%myconfig, $ref->{credit}, $form->{precision}, "&nbsp;");
+    $ref->{linetaxamount} = $form->format_amount(\%myconfig, $ref->{linetaxamount}, $form->{precision}, "&nbsp;");
     
     $column_data{id} = "<td>$ref->{id}</td>";
     $column_data{transdate} = "<td nowrap>$ref->{transdate}</td>";
@@ -894,7 +900,12 @@ sub transactions {
     
     $column_data{debit} = "<td align=right>$ref->{debit}</td>";
     $column_data{credit} = "<td align=right>$ref->{credit}</td>";
-    
+    if ($ref->{linetax_accno}){
+        $column_data{linetax_accno} = "<td>$ref->{linetax_accno}--$ref->{linetax_description}</td>";
+    } else {
+        $column_data{linetax_accno} = "<td>&nbsp;</td>";
+    }
+    $column_data{linetaxamount} = "<td align=right>$ref->{linetaxamount}</td>";
     $column_data{accno} = "<td><a href=$href&accno=$ref->{accno}&callback=$callback>$ref->{accno}</a></td>";
     $column_data{contra} = "<td>";
     for (split / /, $ref->{contra}) {
@@ -930,6 +941,7 @@ sub transactions {
   
   $column_data{debit} = "<th align=right class=listtotal>".$form->format_amount(\%myconfig, $totaldebit, $form->{precision}, "&nbsp;")."</th>";
   $column_data{credit} = "<th align=right class=listtotal>".$form->format_amount(\%myconfig, $totalcredit, $form->{precision}, "&nbsp;")."</th>";
+  $column_data{linetaxamount} = "<th align=right class=listtotal>".$form->format_amount(\%myconfig, $totallinetaxamount, $form->{precision}, "&nbsp;")."</th>";
   $column_data{balance} = "<th align=right class=listtotal>".$form->format_amount(\%myconfig, $form->{balance} *$ml * $cml, $form->{precision}, "&nbsp;")."</th>";
   
   unless ($form->{accno}) {
@@ -1023,11 +1035,13 @@ sub gl_subtotal {
       
   $subtotaldebit = $form->format_amount(\%myconfig, $subtotaldebit, $form->{precision}, "&nbsp;");
   $subtotalcredit = $form->format_amount(\%myconfig, $subtotalcredit, $form->{precision}, "&nbsp;");
+  $subtotallinetaxamount = $form->format_amount(\%myconfig, $subtotallinetaxamount, $form->{precision}, "&nbsp;");
   
   for (@column_index) { $column_data{$_} = "<td>&nbsp;</td>" }
 
   $column_data{debit} = "<th align=right class=listsubtotal>$subtotaldebit</td>";
   $column_data{credit} = "<th align=right class=listsubtotal>$subtotalcredit</td>";
+  $column_data{linetaxamount} = "<th align=right class=listsubtotal>$subtotallinetaxamount</td>";
   
   print "<tr class=listsubtotal>";
   for (@column_index) { print "$column_data{$_}\n" }
@@ -1035,6 +1049,7 @@ sub gl_subtotal {
 
   $subtotaldebit = 0;
   $subtotalcredit = 0;
+  $subtotallinetaxamount = 0;
 
   $sameitem = $ref->{$form->{sort}};
 
@@ -1045,12 +1060,14 @@ sub account_subtotal {
       
   $accountsubtotaldebit = $form->format_amount(\%myconfig, $accountsubtotaldebit, $form->{precision}, "&nbsp;");
   $accountsubtotalcredit = $form->format_amount(\%myconfig, $accountsubtotalcredit, $form->{precision}, "&nbsp;");
+  $accountsubtotallinetaxamount = $form->format_amount(\%myconfig, $accountsubtotallinetaxamount, $form->{precision}, "&nbsp;");
   $balance = $form->format_amount(\%myconfig, $form->{balance} * $ml * $cml, $form->{precision}, 0);
 
   for (@column_index) { $column_data{$_} = "<td>&nbsp;</td>" }
 
   $column_data{debit} = "<th align=right class=listsubtotal>$accountsubtotaldebit</td>";
   $column_data{credit} = "<th align=right class=listsubtotal>$accountsubtotalcredit</td>";
+  $column_data{linetaxamount} = "<th align=right class=listsubtotal>$accountsubtotallinetaxamount</td>";
   $column_data{balance} = "<th align=right class=listsubtotal>$balance</td>";
   
   print "<tr class=listsubtotal>";
@@ -1059,6 +1076,7 @@ sub account_subtotal {
 
   $accountsubtotaldebit = 0;
   $accountsubtotalcredit = 0;
+  $accountsubtotallinetaxamount = 0;
   $form->{balance} = 0;
 
 }
