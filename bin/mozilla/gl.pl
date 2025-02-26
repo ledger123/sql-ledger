@@ -116,6 +116,8 @@ sub edit {
   $i = 1;
   foreach $ref (@{ $form->{GL} }) {
     $form->{"accno_$i"} = "$ref->{accno}--$ref->{description}";
+    $form->{"tax_$i"} = "$ref->{tax_accno}--$ref->{tax_description}" if $ref->{tax_chart_id};
+    $form->{"linetaxamount_$i"} = $ref->{linetaxamount};
 
     $form->{"projectnumber_$i"} = "$ref->{projectnumber}--$ref->{project_id}" if $ref->{project_id};
     for (qw(fx_transaction source memo cleared)) { $form->{"${_}_$i"} = $ref->{$_} }
@@ -181,7 +183,7 @@ sub create_links {
   # references
   &all_references;
 
-  for (qw(department projectnumber accno currency)) { $form->{"select$_"} = $form->escape($form->{"select$_"},1) }
+  for (qw(department projectnumber accno currency tax)) { $form->{"select$_"} = $form->escape($form->{"select$_"},1) }
   
 }
 
@@ -1115,6 +1117,13 @@ sub update {
     for (@flds) { delete $form->{"${_}_$i"} }
   }
 
+  for $i ( 1 .. $count ) {
+    if ( $form->{"tax_$i"} and !$form->{"linetaxamount_$i"} ) {
+        my ( $tax_accno, $null ) = split( /--/, $form->{"tax_$i"} );
+        $form->{"linetaxamount_$i"} = $form->round_amount( ( $form->{"debit_$i"} + $form->{"credit_$i"} ) - ( $form->{"debit_$i"} + $form->{"credit_$i"} ) / ( 1 + $form->{"${tax_accno}_rate"} ), $form->{precision} );
+    }
+  }
+
   $form->{rowcount} = $count + 1;
 
   &display_form;
@@ -1137,6 +1146,7 @@ sub display_rows {
 
   $form->{totaldebit} = 0;
   $form->{totalcredit} = 0;
+  $form->{totallinetaxamount} = 0;
 
   for $i (1 .. $form->{rowcount}) {
 
@@ -1144,6 +1154,11 @@ sub display_rows {
     <td><input name="source_$i" size=10 value="|.$form->quote($form->{"source_$i"}).qq|"></td>|;
     $memo = qq|
     <td><input name="memo_$i" value="|.$form->quote($form->{"memo_$i"}).qq|"></td>|;
+
+    if ( $form->{selecttax} ) {
+      $tax = qq|<td><select name="tax_$i">| . $form->select_option( $form->{selecttax}, $form->{"tax_$i"} ) . qq|</select></td>|;
+      $tax .= qq|<td><input name="linetaxamount_$i" class="inputright" type=text size=12 value="| . $form->format_amount( \%myconfig, $form->{"linetaxamount_$i"}, $form->{precision} ) . qq|"></td>|;
+    }
 
     if ($init) {
       $accno = qq|
@@ -1164,6 +1179,7 @@ sub display_rows {
    
       $form->{totaldebit} += $form->{"debit_$i"};
       $form->{totalcredit} += $form->{"credit_$i"};
+      $form->{totallinetaxamount} += $form->{"linetaxamount_$i"};
 
       for (qw(debit credit)) { $form->{"${_}_$i"} = ($form->{"${_}_$i"}) ? $form->format_amount(\%myconfig, $form->{"${_}_$i"}, $form->{precision}) : "" }
 
@@ -1212,16 +1228,16 @@ sub display_rows {
     <td><input name="credit_$i" class="inputright" size=12 value=$form->{"credit_$i"}></td>
     $source
     $memo
+    $tax
     $project
   </tr>
 |;
 
     $form->hide_form("cleared_$i");
-    
   }
 
   $form->hide_form(qw(rowcount));
-  $form->hide_form(map { "select$_" } qw(accno projectnumber));
+  $form->hide_form(map { "select$_" } qw(accno projectnumber tax));
   
 }
 
@@ -1320,7 +1336,13 @@ sub form_header {
 
   $form->hide_form(qw(id fxadj closedto locked oldtransdate oldcurrency recurring batch batchid batchnumber batchdescription defaultcurrency precision helpref reference_rows referenceurl olddepartment));
   $form->hide_form(map { "select$_" } qw(accno department currency));
-  
+
+  if ( $form->{selecttax} ) {
+    $tax = qq|<th class=listheading>| . $locale->text('Tax Included') . qq|</th>|;
+    $tax .= qq|<th class=listheading>| . $locale->text('Tax Amount') . qq|</th>|;
+  }
+
+
   print qq|
 <input type=hidden name=title value="|.$form->quote($form->{title}).qq|">
 
@@ -1362,6 +1384,7 @@ sub form_header {
 	  <th class=listheading>|.$locale->text('Credit').qq|</th>
 	  <th class=listheading>|.$locale->text('Source').qq|</th>
 	  <th class=listheading>|.$locale->text('Memo').qq|</th>
+      $tax
 	  $project
 	</tr>
 |;
@@ -1407,14 +1430,20 @@ sub form_footer {
     $difference = "";
   }
 
+  if ($form->{selecttax}){
+    $tax = '<th>&nbsp;</th>';
+    $tax .= qq|<th class=listtotal">| . $form->format_amount( \%myconfig, $form->{totallinetaxamount}, 2 ) . qq|</th>|;
+  }
+
   print qq|
         <tr class=listtotal>
 	  <th>&nbsp;</th>
 	  $fx_transaction
-	  <th class=listtotal align=right>$form->{totaldebit}</th>
-	  <th class=listtotal align=right>$form->{totalcredit}</th>
+	  <th class=listtotal>$form->{totaldebit}</th>
+	  <th class=listtotal>$form->{totalcredit}</th>
 	  <th>&nbsp;</th>
 	  <th>&nbsp;</th>
+      $tax
 	  $project
         </tr>
         $difference
@@ -1429,7 +1458,10 @@ sub form_footer {
 
   $form->{action} = "Update";
 
-  $form->hide_form(qw(action path login callback));
+  $form->hide_form(qw(action path login callback taxaccounts));
+  for (split / /, $form->{taxaccounts}){
+      $form->hide_form("${_}_rate");
+  }
   
   $transdate = $form->datetonum(\%myconfig, $form->{transdate});
 
