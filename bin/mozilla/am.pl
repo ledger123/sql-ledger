@@ -2463,7 +2463,7 @@ sub defaults {
   $checked{person} = "checked" if $form->{typeofcontact} eq 'person';
   $roundchange{$form->{roundchange}} = "checked";
 
-  for (qw(cdt checkinventory hideaccounts forcewarehouse)) {
+  for (qw(cdt checkinventory hideaccounts forcewarehouse linetax)) {
     $checked{$_} = "checked" if $form->{$_};
   }
 
@@ -2588,6 +2588,12 @@ sub defaults {
 		<th align=right>|.$locale->text('Hide Closed Accounts').qq|</th>
 		<td><input name=hideaccounts class=checkbox type=checkbox value=1 $checked{hideaccounts}></td>
 	      </tr>
+
+	      <tr>
+		<th align=right>|.$locale->text('Line Tax').qq|</th>
+		<td><input name=linetax class=checkbox type=checkbox value=1 $checked{linetax}></td>
+	      </tr>
+
 	    </table>
 	  </td>
 	</tr>
@@ -2708,7 +2714,7 @@ sub defaults {
 </table>
 |;
 
-  $form->{optional} = "company address tel fax companyemail companywebsite yearend weightunit businessnumber closedto revtrans audittrail method cdt namesbynumber typeofcontact roundchange referenceurl annualinterest latepaymentfee restockingcharge checkinventory hideaccounts forcewarehouse";
+  $form->{optional} = "company address tel fax companyemail companywebsite yearend weightunit businessnumber closedto revtrans audittrail method cdt namesbynumber typeofcontact roundchange referenceurl annualinterest latepaymentfee restockingcharge checkinventory hideaccounts forcewarehouse linetax";
 
   for (qw(gl si so vi batch voucher po sq rfq part project employee customer vendor)) { $form->{optional} .= " ${_}number" }
 
