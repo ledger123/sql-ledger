@@ -465,7 +465,7 @@ sub header {
 
     $self->set_cookie($endsession) unless $nocookie;
 
-    print qq|Content-Type: text/html
+    print qq~Content-Type: text/html
 
 <head>
   <title>$title</title>
@@ -473,10 +473,12 @@ sub header {
   $favicon
   $stylesheet
   $charset
-</head>
+
+  <link rel="stylesheet" href="css/select.css">
+  <script src="css/select.js"></script>
 
 $self->{pre}
-|;
+~;
   }
 
   $self->{header} = 1;
