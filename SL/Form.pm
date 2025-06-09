@@ -465,99 +465,20 @@ sub header {
 
     $self->set_cookie($endsession) unless $nocookie;
 
-    print qq|Content-Type: text/html
+    print qq~Content-Type: text/html
 
 <head>
-  <title>$self->{titlebar}</title>
-  <meta name="robots" content="noindex,nofollow" />
+  <title>$title</title>
+  <META NAME="robots" CONTENT="noindex,nofollow" />
   $favicon
-
-  <link rel="stylesheet" href="css/select2-4.0.13.min.css" type="text/css"/>
-  <link rel="stylesheet" href="css/jquery-ui-1.12.1.min.css" type="text/css"/>
-
   $stylesheet
-
   $charset
 
-  <script src="js/jquery-3.6.0.min.js" type="text/javascript"></script>
-  <script src="js/jquery-ui-1.12.1.min.js" type="text/javascript"></script>
+  <link rel="stylesheet" href="css/select.css">
+  <script src="css/select.js"></script>
 
-  <script src="js/select2-4.0.13.min.js" type="text/javascript"></script>
-
-  <script src="js/rma.js" type="text/javascript"></script>
-|;
-		print q|
-<script>
-$(document).ready(function() {
-	var select2Config = {
-		dropdownAutoWidth : false,
-    	width: 'resolve',
-    	matcher: matchStartStringOnly,
-    	language: {
-       		noResults: function() {
-           		return "|;print qq|$selectNoEntriesText|;print q|";
-       		}
-   		}
-	};
-
-	$('select').select2(select2Config);
-});
-
-function matchStartStringOnly(params, data) {
-  // If there are no search terms, return all of the data
-  if ($.trim(params.term) === '') {
-    return data;
-  }
-
-  // Skip if there is no 'children' property
-  if (typeof data.id === 'undefined') {
-    return null;
-  }
-  	// most accountans pref to search for chart number, and display results by that, while others prefer the description of the chart, therefor we distinguish between number or text search an return different results
-	if(isNaN(params.term)){
-		if (data.id.toUpperCase().includes(params.term.toUpperCase())) {
-    		return data;
-  		}
-  	} else {
-  		if (data.id.toUpperCase().indexOf(params.term.toUpperCase()) == 0) {
-    		return data;
-  		}
-  	}
-
-  // Return `null` if the term should not be displayed
-  return null;
-}
-
-
-$(document).on('select2:open', () => {
-    document.querySelector('.select2-search__field').focus();
-});
-$(document).ready(function(){
-    var str = $('div.redirectmsg').text();
-    if ( str.length > 0 ) {
-    	setTimeout(function(){
-    	
-	    	$('div.redirectmsg').show();
-	        $('div.redirectmsg').fadeOut('slow', function () {
-	            $('div.redirectmsg').remove();
-	        });
-		}, 2000);
-	} else {
-	   	$('div.redirectmsg').hide();
-	}
-|;
-
-		@menuids = split( ':', $self->{menuids} );
-		for (@menuids) { print q|$("#menu| . $_ . qq|").trigger("click");\n|; }
-
-		print q|
-});
-</script>
-</head>
-|;
-		print qq|
 $self->{pre}
-|;
+~;
   }
 
   $self->{header} = 1;

@@ -1,52 +1,39 @@
-######################################################################
-# SQL-Ledger ERP
-# Copyright (c) 2006
+#=====================================================================
+# SQL-Ledger
+# Copyright (c) DWS Systems Inc.
 #
 #  Author: DWS Systems Inc.
 #     Web: http://www.sql-ledger.com
 #
-#######################################################################
+#======================================================================
 #
 # two frame layout with refractured menu
 #
-#######################################################################
+#======================================================================
 
-#$menu file is now set in sql-ledger.conf
 $menufile = "menu.ini";
 use SL::Menu;
 
+require "$form->{path}/js.pl";
 
 1;
 # end of main
 
 
 sub display {
-
+  
   $menuwidth = ($ENV{HTTP_USER_AGENT} =~ /links/i) ? "240" : "155";
   $menuwidth = $myconfig{menuwidth} if $myconfig{menuwidth};
 
-  $form->header(0, 0, $locale);
-
-  $callbacks = { 
-	'ar:ar_reports:ar_reports_transactions' => 'ar.pl?action=search&nextsub=transactions&level=AR--Reports--Transactions',
-	'ar:ar_reports:ar_reports_outstanding' => 'ar.pl?action=search&nextsub=transactions&outstanding=1&level=AR--Reports--Outstanding',
-	'ap:ap_reports:ap_reports_outstanding' => 'ap.pl?action=search&nextsub=transactions&outstanding=1&level=AP--Reports--Outstanding',
-  	'general_ledger:general_ledger_reports:general_ledger_reports_income_statement' => 'rp.pl?action=report&report=income_statement&level=General+Ledger--Reports--Income+Statement',
-  };
+  $form->header;
 
   print qq|
 
-<FRAMESET COLS="240,*" BORDER="1" bordercolor="#53626A">
-  <FRAME NAME="acc_menu" SRC="$form->{script}?login=$form->{login}&action=acc_menu&path=$form->{path}&js=$form->{js}&menuids=$form->{menuids}">
-|;
+<FRAMESET COLS="$menuwidth,*" BORDER="1">
 
-  if ($form->{menuids}){
-    print qq|  <FRAME NAME="main_window" SRC="$callbacks->{$form->{menuids}}&login=$form->{login}&path=$form->{path}">|;
-  } else {
-    print qq|  <FRAME NAME="main_window" SRC="am.pl?login=$form->{login}&action=$form->{main}&path=$form->{path}">|;
-  }
+  <FRAME NAME="acc_menu" SRC="$form->{script}?login=$form->{login}&action=acc_menu&path=$form->{path}&js=$form->{js}">
+  <FRAME NAME="main_window" SRC="am.pl?login=$form->{login}&action=$form->{main}&path=$form->{path}">
 
-  print qq|
 </FRAMESET>
 
 </BODY>
@@ -56,16 +43,15 @@ sub display {
 }
 
 
-
 sub acc_menu {
 
   my $menu = new Menu "$menufile";
-  $menu->add_file("custom_$menufile") if -f "custom_$menufile";
-  $menu->add_file("$form->{login}_$menufile") if -f "$form->{login}_$menufile";
-  
+  $menu->add_file("$form->{path}/custom/$menufile") if -f "$form->{path}/custom/$menufile";
+  $menu->add_file("$form->{path}/custom/$form->{login}/$menufile") if -f "$form->{path}/custom/$form->{login}/$menufile";
+
   $form->{title} = $locale->text('Accounting Menu');
 
-  $form->header(0, 0, $locale);
+  $form->header;
 
   print qq|
 <script type="text/javascript">
@@ -87,32 +73,17 @@ function ChangeClass(menu, newClass) {
   }
 }
 document.onselectstart = new Function("return false");
-
-function SwitchMenuAndSub(menu, submenu) {
-  if (document.getElementById) {
-    var el = document.getElementById(submenu);
-
-    if (el.style.display == "none") {
-      el.style.display = "block"; //display the block of info
-    } else {
-      el.style.display = "none";
-    }
-    
-    if ( document.getElementById(menu).className == 'menuClose' ) {
-    	document.getElementById(menu).className = 'menuOpen';
-    } else if ( document.getElementById(menu).className == 'menuOpen' ) {
-    	document.getElementById(menu).className = 'menuClose';
-    }
-  }
-}
 </script>
 
-<body class=menu>
+<body class=menu />
 
+<img src=$images/sql-ledger.gif width=80 border=0>
+
+<br>$myconfig{name}
 |;
 
   if ($form->{js}) {
-    &js_menu($menu);
+    &jsmenu_frame($menu);
   } else {
     &section_menu($menu);
   }
@@ -192,23 +163,16 @@ sub section_menu {
 
 
 
-sub js_menu {
+sub jsmenu_frame {
   my ($menu, $level) = @_;
 
   # build tiered menus
   my @menuorder = $menu->access_control(\%myconfig, $level);
 
   while (@menuorder){
-    #$i++;
+    $i++;
     $item = shift @menuorder;
     $label = $item;
-    $i = lc $label;
-    $i =~ s/--/_/g;
-    $i =~ s/&//g;
-    $i =~ s/  /_/g;
-    $i =~ s/ /_/g;
-    $i =~ s/-/_/g;
-    $i =~ s/\//_/g;
     $label =~ s/.*--//g;
     $label = $locale->text($label);
 
@@ -219,13 +183,13 @@ sub js_menu {
 	$display = "display: none;" unless $level eq ' ';
 
 	print qq|
-        <div id="menu$i" class="menuClose" onclick="SwitchMenuAndSub('menu$i','sub$i')">$label</div>
+        <div id="menu$i" class="menuOut" onclick="SwitchMenu('sub$i')" onmouseover="ChangeClass('menu$i','menuOver')" onmouseout="ChangeClass('menu$i','menuOut')">$label</div>
 	<div class="submenu" id="sub$i" style="$display">|;
 	
 	# remove same level items
 	map { shift @menuorder } grep /^$item/, @menuorder;
 
-	&js_menu($menu, $item);
+	&jsmenu_frame($menu, $item);
 	
 	print qq|
 	</div>
@@ -235,18 +199,18 @@ sub js_menu {
 
       if ($menu->{$item}{module}) {
 	if ($level eq "") {
-	  print qq|<div id="menu$i" class="menuClose"> |. 
+	  print qq|<div id="menu$i" class="menuOut" onmouseover="ChangeClass('menu$i','menuOver')" onmouseout="ChangeClass('menu$i','menuOut')"> |. 
 	  $menu->menuitem(\%myconfig, \%$form, $item, $level).qq|$label</a></div>|;
 
 	  # remove same level items
 	  map { shift @menuorder } grep /^$item/, @menuorder;
 
-          &js_menu($menu, $item);
+          &jsmenu_frame($menu, $item);
 
 	} else {
 	
 	  print qq|<div class="submenu"> |.
-          $menu->menuitem(\%myconfig, \%$form, $item, $level, $i).qq|$label</a></div>|;
+          $menu->menuitem(\%myconfig, \%$form, $item, $level).qq|$label</a></div>|;
 	}
 
       } else {
@@ -254,15 +218,101 @@ sub js_menu {
 	$display = "display: none;" unless $item eq ' ';
 
 	print qq|
-<div id="menu$i" class="menuClose" onclick="SwitchMenuAndSub('menu$i','sub$i')">$label</div>
+<div id="menu$i" class="menuOut" onclick="SwitchMenu('sub$i')" onmouseover="ChangeClass('menu$i','menuOver')" onmouseout="ChangeClass('menu$i','menuOut')">$label</div>
 	<div class="submenu" id="sub$i" style="$display">|;
 	
-	&js_menu($menu, $item);
+	&jsmenu_frame($menu, $item);
 	
 	print qq|
 	</div>
 |;
 
+      }
+
+    }
+
+  }
+
+}
+
+
+sub jsmenu {
+  my ($menu, $level) = @_;
+  
+  # build menu_{login}.js for user
+  my @menuorder = $menu->access_control(\%myconfig, $level);
+
+  while (@menuorder){
+    $item = shift @menuorder;
+    $label = $item;
+    $label =~ s/.*--//g;
+    $label = $locale->text($label);
+
+    if ($menu->{$item}{submenu}) {
+
+      $form->{items} = 1;
+      
+      $form->{jsmenu} .= $form->{stagger};
+      $form->{jsmenu} .= qq|['$label', null, null,\n|;
+      
+      # remove same level items
+      map { shift @menuorder } grep /^$item/, @menuorder;
+
+      $form->{stagger} .= "\t";
+
+      &jsmenu($menu, $item);
+      
+      chop $form->{stagger};
+      $form->{jsmenu} .= qq|$form->{stagger}],\n|;
+
+    } else {
+
+      if ($menu->{$item}{module}) {
+	$form->{items} = 1;
+	
+	if ($level eq "") {
+
+	  $menu->{$item}{jsmenu} = 1;
+	  $str = $menu->menuitem(\%myconfig, \%$form, $item, $level);
+	  $str =~ s/^<a href=//;
+	  $str =~ s/>$//;
+
+          $form->{jsmenu} .= $form->{stagger};
+	  $form->{jsmenu} .= qq|['$label', '$str'],\n|;
+	  
+	  # remove same level items
+	  map { shift @menuorder } grep /^$item/, @menuorder;
+
+          &jsmenu($menu, $item);
+
+	  $form->{jsmenu} .= qq|$form->{stagger}],\n|;
+	  
+	} else {
+	
+	  $menu->{$item}{jsmenu} = 1;
+	  $str = $menu->menuitem(\%myconfig, \%$form, $item, $level);
+	  $str =~ s/^<a href=//;
+	  $str =~ s/>$//;
+          $form->{jsmenu} .= $form->{stagger};
+	  $form->{jsmenu} .= qq|['$label', '$str'],\n|;
+
+	}
+
+      } else {
+
+        $form->{jsmenu} .= $form->{stagger};
+	$form->{jsmenu} .= qq|['$label', null, null,\n|;
+	$form->{stagger} .= "\t";
+        
+	&jsmenu($menu, $item);
+
+	chop $form->{stagger};
+        if ($form->{items}) {
+	  $form->{jsmenu} .= qq|$form->{stagger}],\n|;
+	} else {
+	  $form->{jsmenu} =~ s/\t??\['$label', null, null,\s*$//;
+	}
+	$form->{items} = 0;
       }
 
     }
