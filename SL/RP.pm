@@ -1776,7 +1776,7 @@ sub alltaxes {
         aa.id, aa.invnumber, aa.transdate,
         aa.description, vc.name, vc.customernumber number, 'ar.pl' script, vc.id as vc_id,
         '' f,
-        SUM(ac.amount), SUM(ac.taxamount) AS tax
+        SUM(ac.amount), SUM(ac.linetaxamount) AS tax
         FROM acc_trans ac
         JOIN chart c ON (c.id = ac.tax_chart_id)
         JOIN ar aa ON (aa.id = ac.trans_id)
@@ -1794,7 +1794,7 @@ sub alltaxes {
         aa.id, aa.invnumber, aa.transdate,
         aa.description, vc.name, vc.customernumber number, 'ar.pl' script, vc.id as vc_id,
         '' f,
-        SUM(ac.amount), SUM(ac.taxamount) AS tax
+        SUM(ac.amount), SUM(ac.linetaxamount) AS tax
         FROM acc_trans ac
         JOIN ar aa ON (aa.id = ac.trans_id)
         JOIN chart c ON (c.id = ac.chart_id)
@@ -1804,7 +1804,7 @@ sub alltaxes {
         $cashwhere
         AND NOT invoice
         AND aa.linetax
-        AND ac.taxamount = 0
+        AND ac.linetaxamount = 0
         AND (c.link like '%AR_amount%' OR c.link like '%IC_sale%' OR c.link like '%IC_income%')
         GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12
 
@@ -1825,7 +1825,7 @@ sub alltaxes {
         $cashwhere
         AND NOT invoice
         AND NOT aa.linetax
-        AND aa.id NOT IN (SELECT DISTINCT trans_id FROM acc_trans WHERE taxamount <> 0)
+        AND aa.id NOT IN (SELECT DISTINCT trans_id FROM acc_trans WHERE linetaxamount <> 0)
         GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13
 
         UNION ALL
@@ -1906,7 +1906,7 @@ sub alltaxes {
         aa.id, aa.invnumber, aa.transdate,
         aa.description, vc.name, vc.vendornumber number, 'ap.pl' script, vc.id as vc_id,
         '' f,
-        SUM(ac.amount), SUM(ac.taxamount) AS tax
+        SUM(ac.amount), SUM(ac.linetaxamount) AS tax
         FROM acc_trans ac
         JOIN chart c ON (c.id = ac.tax_chart_id)
         JOIN ap aa ON (aa.id = ac.trans_id)
@@ -1924,7 +1924,7 @@ sub alltaxes {
         aa.id, aa.invnumber, aa.transdate,
         aa.description, vc.name, vc.vendornumber number, 'ap.pl' script, vc.id as vc_id,
         '' f,
-        SUM(ac.amount), SUM(ac.taxamount) AS tax
+        SUM(ac.amount), SUM(ac.linetaxamount) AS tax
         FROM acc_trans ac
         JOIN ap aa ON (aa.id = ac.trans_id)
         JOIN chart c ON (c.id = ac.chart_id)
@@ -1934,7 +1934,7 @@ sub alltaxes {
         $cashwhere
         AND NOT invoice
         AND aa.linetax
-        AND ac.taxamount = 0
+        AND ac.linetaxamount = 0
         AND (c.link like '%AP_amount%' OR c.link like '%IC_cogs%' OR c.link like '%IC_expense%')
         GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12
 
@@ -1953,7 +1953,7 @@ sub alltaxes {
         $aawhere
         $cashwhere
         AND NOT invoice
-        AND aa.id NOT IN (SELECT DISTINCT trans_id FROM acc_trans WHERE taxamount <> 0)
+        AND aa.id NOT IN (SELECT DISTINCT trans_id FROM acc_trans WHERE linetaxamount <> 0)
         GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13
 
         UNION ALL
@@ -1979,7 +1979,7 @@ sub alltaxes {
         aa.id, aa.reference, aa.transdate,
         aa.description, '', '', 'gl.pl' script, 0 as vc_id,
         '' f,
-        SUM(ac.amount), SUM(ac.taxamount) AS tax
+        SUM(ac.amount), SUM(ac.linetaxamount) AS tax
         FROM acc_trans ac
         JOIN chart c ON (c.id = ac.tax_chart_id)
         JOIN gl aa ON (aa.id = ac.trans_id)
