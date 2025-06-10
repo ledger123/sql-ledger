@@ -308,7 +308,7 @@ sub post_transaction {
 	      bank_id = (SELECT id FROM chart WHERE accno = '$paymentaccno'),
 	      paymentmethod_id = $paymentmethod_id,
 	      language_code = '$form->{language_code}',
-          linetax = $form->{linetax}
+          linetax = '$form->{linetax}'
 	      WHERE id = $form->{id}|;
   $dbh->do($query) || $form->dberror($query);
 
