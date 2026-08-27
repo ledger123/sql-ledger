@@ -1,0 +1,24 @@
+# SQL-Ledger keeps site configuration, login data and per-dataset runtime
+# state inside the source tree. None of it belongs in a public repository.
+
+# ------------------------------------------------------- site configuration
+# Created at install time by copying sql-ledger.conf.default; holds the
+# database connection settings for this install.
+/sql-ledger.conf
+
+# ---------------------------------------------------------------- login data
+# users/members holds the login sections including crypt'ed passwords and the
+# uuencoded database password; users/*.conf are the per-login %myconfig
+# snippets. sql-ledger.eps and sql-ledger.png are distributed files and stay.
+users/members*
+users/*.conf
+users/*.LCK
+
+# ------------------------------------------- per-dataset runtime directories
+# admin.pl creates one of each when a dataset is created. templates/ and
+# spool/ ship empty and git cannot track empty directories -- recreate them
+# after cloning:
+#   mkdir -p templates spool && chown apache:apache templates spool
+/templates/*/
+/spool/*
+/images/*/
